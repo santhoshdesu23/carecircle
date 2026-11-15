@@ -141,7 +141,7 @@ export async function sendTransactionalEmail(params: SendEmailParams): Promise<S
     to: [
       {
         email: params.to,
-        name: params.recipientName || 'CareCircle Member',
+        name: params.recipientName ?? 'CareCircle Member',
       },
     ],
     subject: params.subject,
@@ -158,11 +158,12 @@ export async function sendTransactionalEmail(params: SendEmailParams): Promise<S
   let attempt = 0;
   let lastError = '';
 
+  // Retry loop for transient failures with backoff
   while (attempt < MAX_ATTEMPTS) {
     attempt++;
     try {
       const response = await client.transactionalEmails.sendTransacEmail(brevoRequest);
-      const messageId = response.messageId || response.messageIds?.[0];
+      const messageId = response.messageId ?? response.messageIds?.[0];
 
       if (!messageId) {
         throw new Error('Brevo response did not include an accepted messageId.');

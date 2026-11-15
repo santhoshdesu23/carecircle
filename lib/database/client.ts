@@ -1,5 +1,23 @@
 import { MongoClient, Db } from 'mongodb';
 
+export type MongoErrorKind =
+  | 'MISSING_URI'
+  | 'INVALID_URI_FORMAT'
+  | 'DNS_RESOLUTION_FAILURE'
+  | 'AUTHENTICATION_FAILURE'
+  | 'NETWORK_ACCESS_FAILURE'
+  | 'CONNECTION_TIMEOUT'
+  | 'INDEX_INITIALIZATION_FAILURE'
+  | 'UNKNOWN_DATABASE_ERROR';
+
+export interface MongoErrorClassification {
+  kind: MongoErrorKind;
+  diagnosticMessage: string;
+  userSafeMessage: string;
+  statusCode: number;
+  sanitizedHost?: string;
+}
+
 export interface MongoDiagnosticInfo {
   isConfigured: boolean;
   scheme?: 'mongodb' | 'mongodb+srv' | 'unknown';
@@ -83,6 +101,135 @@ export function getDatabaseName(): string {
   return process.env.MONGODB_DB?.trim() || 'carecircle';
 }
 
+/**
+ * Classifies database errors into structured diagnostic categories
+ * while ensuring no credentials or connection strings are leaked.
+ */
+export function classifyMongoError(error: unknown): MongoErrorClassification {
+  const diag = getMongoDiagnosticInfo();
+  const host = diag.sanitizedHost || 'unknown';
+  const dbName = diag.databaseName || 'carecircle';
+
+  if (!diag.isConfigured) {
+    return {
+      kind: 'MISSING_URI',
+      diagnosticMessage: 'MONGODB_URI is not defined in environment variables.',
+      userSafeMessage: 'Database configuration missing. Please verify server settings.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  if (diag.scheme === 'unknown') {
+    return {
+      kind: 'INVALID_URI_FORMAT',
+      diagnosticMessage: `Invalid connection scheme in MONGODB_URI. Expected 'mongodb://' or 'mongodb+srv://'.`,
+      userSafeMessage: 'Database connection configuration error.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  if (diag.hasPotentialUnencodedAt) {
+    return {
+      kind: 'INVALID_URI_FORMAT',
+      diagnosticMessage: `Detected multiple '@' characters in MONGODB_URI. Special characters in password must be URL-encoded (e.g. '%40').`,
+      userSafeMessage: 'Database connection string format error.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  const err = error as Record<string, unknown>;
+  const errMsg = typeof err?.message === 'string' ? err.message : String(error);
+  const errCode = err?.code;
+  const errName = typeof err?.name === 'string' ? err.name : '';
+
+  // DNS Resolution Failure
+  if (
+    errCode === 'ENOTFOUND' ||
+    errMsg.includes('querySrv ENOTFOUND') ||
+    errMsg.includes('queryTxt ETIMEOUT') ||
+    errMsg.includes('querySrv EREFUSED') ||
+    errMsg.includes('getaddrinfo ENOTFOUND')
+  ) {
+    return {
+      kind: 'DNS_RESOLUTION_FAILURE',
+      diagnosticMessage: `DNS lookup failed for MongoDB host [${host}]: ${errMsg}. Check Atlas cluster hostname.`,
+      userSafeMessage: 'Database service is temporarily unavailable. Please try again shortly.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  // Authentication Failure
+  if (
+    errName === 'MongoServerError' &&
+    (errCode === 18 ||
+      err?.codeName === 'AuthenticationFailed' ||
+      errMsg.includes('Authentication failed'))
+  ) {
+    return {
+      kind: 'AUTHENTICATION_FAILURE',
+      diagnosticMessage: `Authentication failed for database [${dbName}]. Verify username and password in MONGODB_URI.`,
+      userSafeMessage: 'Database authentication failed. Please check service configuration.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  // Network Access Failure (e.g. IP whitelist / firewall block)
+  if (
+    errCode === 'ECONNREFUSED' ||
+    errCode === 'EHOSTUNREACH' ||
+    errCode === 'ENETUNREACH' ||
+    errMsg.includes('ECONNREFUSED')
+  ) {
+    return {
+      kind: 'NETWORK_ACCESS_FAILURE',
+      diagnosticMessage: `Connection refused to host [${host}]. Ensure Network Access (IP Access List) allows 0.0.0.0/0 on Atlas.`,
+      userSafeMessage: 'Database service is unreachable. Please verify network access settings.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  // Connection Timeout
+  if (
+    errName === 'MongoServerSelectionError' ||
+    errName === 'MongoTimeoutError' ||
+    errMsg.includes('Server selection timed out') ||
+    errCode === 'ETIMEDOUT'
+  ) {
+    return {
+      kind: 'CONNECTION_TIMEOUT',
+      diagnosticMessage: `Connection to host [${host}] timed out: ${errMsg}.`,
+      userSafeMessage: 'Database connection timed out. Please try again in a few moments.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  // Index Initialization Failure
+  if (errMsg.includes('Index creation failed') || errMsg.includes('ensureDatabaseIndexes')) {
+    return {
+      kind: 'INDEX_INITIALIZATION_FAILURE',
+      diagnosticMessage: `Index creation failed on database [${dbName}]: ${errMsg}`,
+      userSafeMessage: 'Database index initialization error.',
+      statusCode: 503,
+      sanitizedHost: host,
+    };
+  }
+
+  return {
+    kind: 'UNKNOWN_DATABASE_ERROR',
+    diagnosticMessage: `Database operation error on [${host}]: ${errMsg}`,
+    userSafeMessage: 'A database error occurred. Please try again later.',
+    statusCode: 500,
+    sanitizedHost: host,
+  };
+}
+
 interface GlobalMongo {
   _mongoClientPromise?: Promise<MongoClient> | null;
   _mongoClient?: MongoClient | null;
@@ -131,6 +278,7 @@ async function createClientPromise(): Promise<MongoClient> {
 
 /**
  * Returns the cached MongoClient promise, reusing connections across serverless invocations.
+ * This is 100% lazy and NEVER executes at module import time.
  */
 export function getMongoClientPromise(): Promise<MongoClient> {
   if (!globalThis._mongoClientPromise) {
@@ -141,6 +289,7 @@ export function getMongoClientPromise(): Promise<MongoClient> {
 
 /**
  * Returns the active MongoDB Db instance.
+ * Connection is established on-demand when first awaited at runtime.
  */
 export async function getDatabase(): Promise<Db> {
   try {
@@ -150,14 +299,28 @@ export async function getDatabase(): Promise<Db> {
     // Clear the promise so next request has a fresh opportunity to connect
     globalThis._mongoClientPromise = null;
     globalThis._mongoClient = null;
-    const diag = getMongoDiagnosticInfo();
-    const errMsg = error instanceof Error ? error.message : String(error);
-    console.error(
-      `[MongoDB Database Error] Connection failed for target host "${diag.sanitizedHost || 'unknown'}": ${errMsg}`
-    );
+    const classified = classifyMongoError(error);
+    console.error(`[MongoDB Database Error] ${classified.diagnosticMessage}`);
     throw error;
   }
 }
 
-// Default export satisfies existing imports
-export default getMongoClientPromise();
+/**
+ * Lazy default export.
+ * Does NOT invoke getMongoClientPromise() at module import time!
+ * Satisfies any legacy promise imports without causing build-time connections.
+ */
+const lazyClientPromise: Promise<MongoClient> = {
+  then(onfulfilled, onrejected) {
+    return getMongoClientPromise().then(onfulfilled, onrejected);
+  },
+  catch(onrejected) {
+    return getMongoClientPromise().catch(onrejected);
+  },
+  finally(onfinally) {
+    return getMongoClientPromise().finally(onfinally);
+  },
+  [Symbol.toStringTag]: 'Promise',
+} as Promise<MongoClient>;
+
+export default lazyClientPromise;

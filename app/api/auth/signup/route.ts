@@ -10,6 +10,7 @@ import { hashPassword, verifyPassword } from '@/lib/auth/password';
 import { setSessionCookie } from '@/lib/auth/session';
 import { checkRateLimit } from '@/lib/auth/rate-limiter';
 import { ensureDatabaseIndexes } from '@/lib/database/indexes';
+import { classifyMongoError } from '@/lib/database/client';
 import { sendAccountVerificationEmail } from '@/lib/email';
 import { logAuditEvent } from '@/lib/audit';
 import { User, ElderlyProfile, CareCircleMember } from '@/types';
@@ -323,18 +324,23 @@ export async function POST(req: NextRequest) {
       (error as any)?.code === 'ENOTFOUND' ||
       (error as any)?.name === 'MongoNetworkError' ||
       (error as any)?.name === 'MongoTimeoutError' ||
+      (error as any)?.name === 'MongoServerError' ||
       (error as any)?.message?.includes('querySrv') ||
-      (error as any)?.message?.includes('ECONNREFUSED');
+      (error as any)?.message?.includes('ECONNREFUSED') ||
+      (error as any)?.message?.includes('Index creation failed');
 
     if (isDbError) {
-      console.error(`[Signup ${requestId}] Database connectivity failure:`, error);
+      const classified = classifyMongoError(error);
+      console.error(
+        `[Signup ${requestId}] Database Error [${classified.kind}]: ${classified.diagnosticMessage}`
+      );
       return NextResponse.json(
         {
-          error: 'The database service is temporarily unavailable. Please try again shortly.',
-          code: 'DATABASE_UNAVAILABLE',
+          error: classified.userSafeMessage,
+          code: classified.kind,
           requestId,
         },
-        { status: 503 }
+        { status: classified.statusCode }
       );
     }
 

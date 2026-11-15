@@ -110,20 +110,22 @@ $ npm run test
 > vitest run
 
  ✓ tests/doses.test.ts (3 tests)
- ✓ tests/email-reminders.test.ts (5 tests)
+ ✓ tests/email-reminders.test.ts (14 tests)
  ✓ tests/timezone.test.ts (3 tests)
  ✓ tests/schedules.test.ts (7 tests)
  ✓ tests/validations.test.ts (5 tests)
+ ✓ tests/mongo-client.test.ts (13 tests)
  ✓ tests/permissions.test.ts (3 tests)
  ✓ tests/authorization.test.ts (4 tests)
  ✓ tests/invitations.test.ts (3 tests)
  ✓ tests/concurrency.test.ts (2 tests)
  ✓ tests/seed-security.test.ts (1 test)
  ✓ tests/auth.test.ts (5 tests)
+ ✓ tests/signup-flow.test.ts (17 tests)
 
- Test Files  11 passed (11)
-      Tests  41 passed (41)
-   Duration  3.23s
+ Test Files  13 passed (13)
+      Tests  80 passed (80)
+   Duration  3.71s
 Exit Code: 0
 ```
 
@@ -135,10 +137,12 @@ $ npm run build
 > next build
 
 ▲ Next.js 16.4.6 (Turbopack)
-✓ Compiled successfully in 3.0s
-✓ Finished TypeScript in 4.3s
-✓ Generating static pages using 15 workers (30/30) in 938ms
-✓ All 33 routes compiled and optimized
+✓ Running next.config.mjs took 38ms
+✓ Compiled successfully in 2.5s
+✓ Finished TypeScript in 3.2s
+✓ Generating static pages using 15 workers (26/26) in 322ms
+✓ Finalizing page optimization
+✓ All 34 routes compiled and optimized
 Exit Code: 0
 ```
 

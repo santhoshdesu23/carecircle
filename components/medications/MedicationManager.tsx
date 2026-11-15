@@ -324,79 +324,78 @@ export function MedicationManager({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label htmlFor="medication-form-select" className="text-xs font-bold text-slate-800">
-                Form *
-              </label>
-              <select
-                id="medication-form-select"
-                value={form}
-                onChange={(e) => setForm(e.target.value as MedicationForm)}
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+              <label
+                htmlFor="medication-form-select"
+                className="block text-xs font-bold text-slate-800"
               >
-                <option value="tablet">Tablet</option>
-                <option value="capsule">Capsule</option>
-                <option value="liquid">Liquid</option>
-                <option value="injection">Injection</option>
-                <option value="inhaler">Inhaler</option>
-                <option value="drops">Drops</option>
-                <option value="topical">Topical</option>
-                <option value="patch">Patch</option>
-                <option value="other">Other</option>
-              </select>
+                <span>Form *</span>
+                <select
+                  id="medication-form-select"
+                  value={form}
+                  onChange={(e) => setForm(e.target.value as MedicationForm)}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal"
+                >
+                  <option value="tablet">Tablet</option>
+                  <option value="capsule">Capsule</option>
+                  <option value="liquid">Liquid</option>
+                  <option value="injection">Injection</option>
+                  <option value="inhaler">Inhaler</option>
+                  <option value="drops">Drops</option>
+                  <option value="topical">Topical</option>
+                  <option value="patch">Patch</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
             </div>
 
             <div className="space-y-1.5">
               <label
                 htmlFor="medication-frequency-select"
-                className="text-xs font-bold text-slate-800"
+                className="block text-xs font-bold text-slate-800"
               >
-                Frequency *
+                <span>Frequency *</span>
+                <select
+                  id="medication-frequency-select"
+                  value={frequency}
+                  onChange={(e) => handleFrequencyChange(e.target.value as MedicationFrequency)}
+                  className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal"
+                >
+                  <option value="once_daily">Once Daily</option>
+                  <option value="twice_daily">Twice Daily</option>
+                  <option value="three_times_daily">Three Times Daily</option>
+                  <option value="four_times_daily">Four Times Daily</option>
+                  <option value="custom">Custom Times</option>
+                </select>
               </label>
-              <select
-                id="medication-frequency-select"
-                value={frequency}
-                onChange={(e) => handleFrequencyChange(e.target.value as MedicationFrequency)}
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
-              >
-                <option value="once_daily">Once Daily</option>
-                <option value="twice_daily">Twice Daily</option>
-                <option value="three_times_daily">Three Times Daily</option>
-                <option value="four_times_daily">Four Times Daily</option>
-                <option value="custom">Custom Times</option>
-              </select>
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label
-              htmlFor="medication-scheduled-times"
-              className="text-xs font-bold text-slate-800"
-            >
-              Scheduled Times (24h format, comma-separated) *
-            </label>
-            <Input
-              id="medication-scheduled-times"
-              value={scheduledTimesStr}
-              onChange={(e) => setScheduledTimesStr(e.target.value)}
-              placeholder="08:00, 20:00"
-              helperText="Examples: 08:00 (for 8 AM), 12:30 (for 12:30 PM), 20:00 (for 8 PM)"
-              required
-            />
-          </div>
+          <Input
+            id="medication-scheduled-times"
+            label="Scheduled Times (24h format, comma-separated) *"
+            value={scheduledTimesStr}
+            onChange={(e) => setScheduledTimesStr(e.target.value)}
+            placeholder="08:00, 20:00"
+            helperText="Examples: 08:00 (for 8 AM), 12:30 (for 12:30 PM), 20:00 (for 8 PM)"
+            required
+          />
 
           <div className="space-y-1.5">
-            <label htmlFor="medication-instructions" className="text-xs font-bold text-slate-800">
-              Patient Instructions *
+            <label
+              htmlFor="medication-instructions"
+              className="block text-xs font-bold text-slate-800"
+            >
+              <span>Patient Instructions *</span>
+              <textarea
+                id="medication-instructions"
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="e.g. Take 1 tablet with full glass of water after breakfast."
+                className="mt-1.5 w-full rounded-lg border border-slate-300 p-3 text-xs font-normal focus:outline-none focus:ring-2 focus:ring-teal-600"
+                rows={2}
+                required
+              />
             </label>
-            <textarea
-              id="medication-instructions"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="e.g. Take 1 tablet with full glass of water after breakfast."
-              className="w-full rounded-lg border border-slate-300 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-teal-600"
-              rows={2}
-              required
-            />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

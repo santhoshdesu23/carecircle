@@ -31,24 +31,30 @@ This report documents the resolution and verification of all release blockers id
 ## Blocker 1: Next.js Dependency Security Remediation
 
 ### 1. Vulnerability Assessment
+
 The original codebase ran on Next.js 14.2.35. Official advisory **GHSA-2464-fhr4-w9xw** identified a critical remote code execution vulnerability in Next.js Image Optimization affecting versions up to 15.5.27.
 
 ### 2. Remediation Applied
+
 - Upgraded Next.js to **`16.4.6`** with Turbopack bundler.
 - Upgraded ESLint to version 9 flat config (`eslint.config.mjs`) compatible with modern Next.js.
 - Resolved breaking changes individually without indiscriminate `npm audit fix --force`.
 - Regenerated clean lockfile via `npm ci`.
 
 ### 3. Production Dependency Audit (`npm audit --omit=dev`)
+
 ```
 $ npm audit --omit=dev
 found 0 vulnerabilities
 Exit Code: 0
 ```
+
 There are **zero known vulnerabilities** affecting production runtime dependencies.
 
 ### 4. Documentation of DevDependencies (Testing Tools)
+
 A total of 13 non-production findings exist in dev-only test dependencies (`vitest` 2.1.9, `tinypool` 2.1.1, `esbuild` 0.21.5 via vite, and `minimatch` via `typescript-eslint`).
+
 - **Advisories:** GHSA-5gmw-xhrv-c9v3 (tinypool worker options prototype pollution), GHSA-67mh-4wv8-2f99 (esbuild dev server header validation), GHSA-g3hv-75wg-m249 (minimatch glob amplification).
 - **Reachability in Production:** **None**. These packages are in `devDependencies`, are never bundled by Next.js/Turbopack, and are not deployed to Vercel production serverless instances.
 - **Mitigation:** Production build uses Turbopack (`next build`), completely excluding Vite and Vitest from the deployed bundle.
@@ -58,6 +64,7 @@ A total of 13 non-production findings exist in dev-only test dependencies (`vite
 ## Blocker 2: Vercel Schedules & Queue-Driven Reminders
 
 ### 1. Architecture
+
 Medication reminders are no longer dependent on a single once-daily 08:00 UTC Cron run. The scheduling system now uses `@vercel/schedules`:
 
 1. **Medication Scheduling (`lib/schedules/index.ts`)**:
@@ -119,6 +126,7 @@ Medication reminders are no longer dependent on a single once-daily 08:00 UTC Cr
 ## Blocker 5: Quality Assurance & Verification Suite
 
 ### 1. TypeScript Strict Mode
+
 ```
 $ npm run typecheck
 > tsc --noEmit
@@ -126,12 +134,14 @@ Exit Code: 0 (No type errors)
 ```
 
 ### 2. Unused Declarations & Parameters
+
 ```
 $ npx tsc --noEmit --noUnusedLocals --noUnusedParameters
 Exit Code: 0 (0 unused imports, 0 unused locals, 0 unused parameters)
 ```
 
 ### 3. ESLint 9 Flat Config
+
 ```
 $ npm run lint
 > eslint .
@@ -139,6 +149,7 @@ Exit Code: 0 (0 warnings, 0 errors)
 ```
 
 ### 4. Prettier Formatting
+
 ```
 $ npm run format:check
 > prettier --check "**/*.{ts,tsx,js,jsx,json,md,css}"
@@ -147,6 +158,7 @@ Exit Code: 0
 ```
 
 ### 5. Automated Vitest Suite (41 Tests)
+
 ```
 $ npm run test
 > vitest run
@@ -170,6 +182,7 @@ Exit Code: 0
 ```
 
 ### 6. Next.js 16.4.6 Turbopack Production Build
+
 ```
 $ npm run build
 > next build
@@ -187,6 +200,7 @@ Exit Code: 0
 ## Blocker 6: SonarQube Clean Code Results
 
 All **67 original findings** plus the **7 subsequent component findings** have been resolved across the codebase:
+
 - **`typescript:S6759`**: All component props marked as `Readonly<Props>`.
 - **`typescript:S6853`**: All form labels explicitly linked to input/select/textarea controls via `htmlFor` and `id`.
 - **`typescript:S6844`**: Context provider value memoized with `useMemo` and callbacks with `useCallback`.

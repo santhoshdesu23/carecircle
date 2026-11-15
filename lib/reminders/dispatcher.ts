@@ -61,7 +61,7 @@ export async function runReminderDispatcher(): Promise<DispatchSummary> {
         if (!profile) return;
 
         const template = renderUpcomingDoseEmail({
-          elderlyName: profile.preferredName || profile.fullName,
+          elderlyName: profile.preferredName ?? profile.fullName,
           medicationName: dose.medicationName,
           dosage: dose.dosage,
           form: dose.form,
@@ -135,7 +135,7 @@ export async function runReminderDispatcher(): Promise<DispatchSummary> {
         if (!profile) return;
 
         const template = renderMissedDoseEmail({
-          elderlyName: profile.preferredName || profile.fullName,
+          elderlyName: profile.preferredName ?? profile.fullName,
           medicationName: dose.medicationName,
           dosage: dose.dosage,
           scheduledTime: dose.scheduledTime,
@@ -185,7 +185,7 @@ export async function runReminderDispatcher(): Promise<DispatchSummary> {
         const profile = await profilesCol.findOne({ _id: appt.elderlyProfileId });
         if (!profile) return;
 
-        const timezone = profile.timezone || 'UTC';
+        const timezone = profile.timezone ?? 'UTC';
         const apptDateTime = parseDateTimeInTimezone(
           appt.appointmentDate,
           appt.appointmentTime,
@@ -209,7 +209,7 @@ export async function runReminderDispatcher(): Promise<DispatchSummary> {
         // 24-Hour Reminder (fires when appointment is within next 24 hours)
         if (diffHours <= 24 && !appt.remindersSent?.reminder24h) {
           const template = renderAppointmentReminderEmail({
-            elderlyName: profile.preferredName || profile.fullName,
+            elderlyName: profile.preferredName ?? profile.fullName,
             doctorName: appt.doctorName,
             clinicName: appt.hospitalClinicName,
             appointmentDate: appt.appointmentDate,
@@ -254,7 +254,7 @@ export async function runReminderDispatcher(): Promise<DispatchSummary> {
         // 2-Hour Reminder (fires when appointment is within next 2 hours)
         if (diffHours <= 2 && !appt.remindersSent?.reminder2h) {
           const template = renderAppointmentReminderEmail({
-            elderlyName: profile.preferredName || profile.fullName,
+            elderlyName: profile.preferredName ?? profile.fullName,
             doctorName: appt.doctorName,
             clinicName: appt.hospitalClinicName,
             appointmentDate: appt.appointmentDate,

@@ -3,6 +3,7 @@ import {
   getMongoDiagnosticInfo,
   getSanitizedMongoUri,
   getDatabaseName,
+  classifyMongoError,
 } from '@/lib/database/client';
 
 describe('MongoDB Client & URI Configuration Diagnostics', () => {
@@ -71,5 +72,86 @@ describe('MongoDB Client & URI Configuration Diagnostics', () => {
 
     process.env.MONGODB_DB = 'custom_db';
     expect(getDatabaseName()).toBe('custom_db');
+  });
+
+  describe('classifyMongoError Diagnostics & Safe Error Messaging', () => {
+    beforeEach(() => {
+      process.env.MONGODB_URI =
+        'mongodb+srv://dbuser:validpass@cluster0.example.mongodb.net/carecircle';
+    });
+
+    it('should classify DNS resolution failure (querySrv ENOTFOUND)', () => {
+      const error = new Error('querySrv ENOTFOUND _mongodb._tcp.23Db');
+      (error as any).code = 'ENOTFOUND';
+
+      const res = classifyMongoError(error);
+      expect(res.kind).toBe('DNS_RESOLUTION_FAILURE');
+      expect(res.statusCode).toBe(503);
+      expect(res.diagnosticMessage).toContain('DNS lookup failed');
+      expect(res.diagnosticMessage).not.toContain('validpass');
+      expect(res.userSafeMessage).toBe(
+        'Database service is temporarily unavailable. Please try again shortly.'
+      );
+    });
+
+    it('should classify Authentication failure', () => {
+      const error = new Error('Authentication failed.');
+      (error as any).name = 'MongoServerError';
+      (error as any).code = 18;
+
+      const res = classifyMongoError(error);
+      expect(res.kind).toBe('AUTHENTICATION_FAILURE');
+      expect(res.statusCode).toBe(503);
+      expect(res.diagnosticMessage).toContain('Authentication failed');
+      expect(res.userSafeMessage).toContain('Database authentication failed');
+    });
+
+    it('should classify Network Access failure (ECONNREFUSED / IP whitelist block)', () => {
+      const error = new Error('connect ECONNREFUSED 192.0.2.1:27017');
+      (error as any).code = 'ECONNREFUSED';
+
+      const res = classifyMongoError(error);
+      expect(res.kind).toBe('NETWORK_ACCESS_FAILURE');
+      expect(res.statusCode).toBe(503);
+      expect(res.diagnosticMessage).toContain('Connection refused');
+    });
+
+    it('should classify Connection Timeout', () => {
+      const error = new Error('Server selection timed out after 5000 ms');
+      (error as any).name = 'MongoServerSelectionError';
+
+      const res = classifyMongoError(error);
+      expect(res.kind).toBe('CONNECTION_TIMEOUT');
+      expect(res.statusCode).toBe(503);
+      expect(res.diagnosticMessage).toContain('timed out');
+    });
+
+    it('should classify Index Initialization failure', () => {
+      const error = new Error('Index creation failed on users collection: namespace not found');
+
+      const res = classifyMongoError(error);
+      expect(res.kind).toBe('INDEX_INITIALIZATION_FAILURE');
+      expect(res.statusCode).toBe(503);
+      expect(res.diagnosticMessage).toContain('Index creation failed');
+    });
+
+    it('should classify Missing URI when MONGODB_URI is undefined', () => {
+      delete process.env.MONGODB_URI;
+
+      const res = classifyMongoError(new Error('Any error'));
+      expect(res.kind).toBe('MISSING_URI');
+      expect(res.statusCode).toBe(503);
+      expect(res.diagnosticMessage).toContain('MONGODB_URI is not defined');
+    });
+
+    it('should classify Invalid URI format when unencoded "@" is present', () => {
+      process.env.MONGODB_URI =
+        'mongodb+srv://user:my@password@cluster0.abcde.mongodb.net/carecircle';
+
+      const res = classifyMongoError(new Error('Connection error'));
+      expect(res.kind).toBe('INVALID_URI_FORMAT');
+      expect(res.statusCode).toBe(503);
+      expect(res.diagnosticMessage).toContain("multiple '@' characters");
+    });
   });
 });

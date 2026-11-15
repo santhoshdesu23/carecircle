@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/auth/signup/route';
-import { GET as verifyGet, POST as verifyPost } from '@/app/api/auth/verify-email/route';
+import { POST as verifyPost } from '@/app/api/auth/verify-email/route';
 import { User, ElderlyProfile, CareCircleMember } from '@/types';
 import { hashPassword } from '@/lib/auth/password';
 
@@ -106,8 +106,6 @@ vi.mock('@/lib/audit', () => ({
   logAuditEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { resetRateLimit } from '@/lib/auth/rate-limiter';
-
 let testSeq = 1;
 function createSignupRequest(body: Record<string, unknown>, ip?: string): NextRequest {
   const requestIp = ip || `127.0.0.${testSeq++}`;
@@ -130,6 +128,8 @@ describe('CareCircle Comprehensive Signup Flow & Verification State Machine', ()
     mockDbFails = false;
     mockInsertFails = false;
     mockSessionFails = false;
+    process.env.MONGODB_URI =
+      'mongodb+srv://mockuser:mockpass@cluster0.demo.mongodb.net/carecircle';
     mockSendEmail.mockResolvedValue({ success: true, status: 'sent', messageId: '<mock-msg-id>' });
   });
 
@@ -220,6 +220,7 @@ describe('CareCircle Comprehensive Signup Flow & Verification State Machine', ()
 
     expect(res.status).toBe(400);
     expect(data.error).toBeDefined();
+    expect(data.error).toBeDefined();
     expect(mockUsers.size).toBe(0);
   });
 
@@ -235,6 +236,7 @@ describe('CareCircle Comprehensive Signup Flow & Verification State Machine', ()
     const data = await res.json();
 
     expect(res.status).toBe(400);
+    expect(data.error).toBeDefined();
     expect(data.error).toContain('at least 8');
   });
 
@@ -250,6 +252,7 @@ describe('CareCircle Comprehensive Signup Flow & Verification State Machine', ()
     const data = await res.json();
 
     expect(res.status).toBe(400);
+    expect(data.error).toBeDefined();
   });
 
   it('7. Rejects duplicate email for active account with HTTP 409', async () => {
@@ -294,8 +297,8 @@ describe('CareCircle Comprehensive Signup Flow & Verification State Machine', ()
     const data = await res.json();
 
     expect(res.status).toBe(503);
-    expect(data.code).toBe('DATABASE_UNAVAILABLE');
-    expect(data.error).toContain('database service is temporarily unavailable');
+    expect(data.code).toBe('DNS_RESOLUTION_FAILURE');
+    expect(data.error).toContain('Database service is temporarily unavailable');
     expect(data.requestId).toBeDefined();
   });
 

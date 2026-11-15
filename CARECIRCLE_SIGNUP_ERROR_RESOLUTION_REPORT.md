@@ -3,19 +3,21 @@
 **Date:** November 15, 2026  
 **Incident:** `POST /api/auth/signup` returning HTTP 500 Internal Server Error in Vercel Production  
 **Frontend User Message:** `"An unexpected error occurred during signup."`  
-**Status:** Remediated & Verified  
+**Status:** Remediated & Verified
 
 ---
 
 ## 1. Actual Root Cause Analysis
 
 From the Vercel production logs provided:
+
 ```
 Error ensuring indexes:
 Error: querySrv ENOTFOUND _mongodb._tcp.23Db
 ```
 
 ### What Happened
+
 1. The MongoDB Node.js driver uses DNS SRV queries to discover replica set members when connecting to a MongoDB Atlas cluster (`mongodb+srv://...`).
 2. When the driver attempts to resolve the SRV record, it issues a DNS query formatted as `_mongodb._tcp.<hostname>`.
 3. In production, the driver attempted to resolve: `_mongodb._tcp.23Db`.
@@ -48,23 +50,24 @@ Error: querySrv ENOTFOUND _mongodb._tcp.23Db
 
 ## 3. Files Modified
 
-| File | Nature of Changes |
-| :--- | :--- |
-| `lib/database/client.ts` | Added safe URI sanitization, credential-safe diagnostic parsing, unencoded `@` detection, and singleton connection pool promise reset on failure |
-| `lib/database/indexes.ts` | Added singleton promise lock to prevent duplicate concurrent index runs, structured error logging, and clean diagnostic failure reporting |
-| `types/index.ts` | Added `UserAccountStatus` (`pending_verification`, `active`, `disabled`) and `emailVerificationExpires` to `User` |
-| `app/api/auth/signup/route.ts` | Complete refactor: 503 on database unavailability, 409 on duplicate, Brevo email failure isolation, unverified account recovery state machine, correlation request IDs |
-| `app/api/auth/signin/route.ts` | Added 403 check for disabled accounts and 503 response for database unavailability |
-| `app/api/auth/verify-email/route.ts` | New verification redemption endpoint supporting both GET (email link) and POST (API) |
-| `.prettierrc` | Added `"endOfLine": "auto"` to harmonize cross-platform CRLF/LF linting |
-| `tests/mongo-client.test.ts` | Unit tests for MongoDB diagnostic parser, URI sanitization, unencoded `@` detection, and quote stripping |
-| `tests/signup-flow.test.ts` | Integration test suite covering 17 distinct scenarios across database failures, Brevo failures, and recovery flows |
+| File                                 | Nature of Changes                                                                                                                                                      |
+| :----------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/database/client.ts`             | Added safe URI sanitization, credential-safe diagnostic parsing, unencoded `@` detection, and singleton connection pool promise reset on failure                       |
+| `lib/database/indexes.ts`            | Added singleton promise lock to prevent duplicate concurrent index runs, structured error logging, and clean diagnostic failure reporting                              |
+| `types/index.ts`                     | Added `UserAccountStatus` (`pending_verification`, `active`, `disabled`) and `emailVerificationExpires` to `User`                                                      |
+| `app/api/auth/signup/route.ts`       | Complete refactor: 503 on database unavailability, 409 on duplicate, Brevo email failure isolation, unverified account recovery state machine, correlation request IDs |
+| `app/api/auth/signin/route.ts`       | Added 403 check for disabled accounts and 503 response for database unavailability                                                                                     |
+| `app/api/auth/verify-email/route.ts` | New verification redemption endpoint supporting both GET (email link) and POST (API)                                                                                   |
+| `.prettierrc`                        | Added `"endOfLine": "auto"` to harmonize cross-platform CRLF/LF linting                                                                                                |
+| `tests/mongo-client.test.ts`         | Unit tests for MongoDB diagnostic parser, URI sanitization, unencoded `@` detection, and quote stripping                                                               |
+| `tests/signup-flow.test.ts`          | Integration test suite covering 17 distinct scenarios across database failures, Brevo failures, and recovery flows                                                     |
 
 ---
 
 ## 4. Fix Implemented
 
 ### A. Safe MongoDB Connection Management (`lib/database/client.ts`)
+
 1. **Accidental Quote & Whitespace Stripping**:
    `raw.trim().replace(/^["']|["']$/g, '')` ensures that accidental quotes added in Vercel dashboard environment variables do not corrupt the URI.
 2. **Credential-Safe Diagnostic Logging**:
@@ -75,10 +78,12 @@ Error: querySrv ENOTFOUND _mongodb._tcp.23Db
    Reuses `globalThis._mongoClientPromise` across warm serverless functions. If a connection fails (e.g., DNS error, ENOTFOUND), the promise is explicitly cleared (`globalThis._mongoClientPromise = null`), allowing subsequent requests to reconnect once the environment variable is corrected in Vercel.
 
 ### B. Index Initialization Safety (`lib/database/indexes.ts`)
+
 - Added `indexesPromise` singleton guard so concurrent requests do not spawn redundant index creation operations.
 - Diagnostic logging outputs clear error messages without secrets.
 
 ### C. Registration State Machine & Brevo Email Failure Isolation (`app/api/auth/signup/route.ts`)
+
 1. **Never 500 on Email Provider Issues**:
    If Brevo returns 401 Unauthorized, 429 Rate Limit, or network timeout, the newly created account is **not deleted or corrupted**. The user account is saved with `status: 'pending_verification'` and the API returns HTTP 201 Created with `emailDelivery: { status: 'failed' }` and a message allowing the user to resend verification.
 2. **Unverified Account Recovery (Preventing Orphan State)**:
@@ -100,6 +105,7 @@ Error: querySrv ENOTFOUND _mongodb._tcp.23Db
 ## 5. Database Verification
 
 Tested against MongoDB connection failure simulations:
+
 - When MongoDB throws `MongoServerSelectionError` or `ENOTFOUND`, the API returns HTTP 503 with:
   ```json
   {
@@ -125,33 +131,33 @@ Tested against MongoDB connection failure simulations:
 
 Vitest executed across **13 test files** with **73 total tests**:
 
-| Test Suite | Total Tests | Outcome |
-| :--- | :--- | :--- |
-| `tests/signup-flow.test.ts` | 17 tests | **ALL PASS** |
-| `tests/mongo-client.test.ts` | 6 tests | **ALL PASS** |
-| `tests/email-reminders.test.ts` | 14 tests | **ALL PASS** |
-| `tests/auth.test.ts` | 5 tests | **ALL PASS** |
-| `tests/authorization.test.ts` | 4 tests | **ALL PASS** |
-| `tests/schedules.test.ts` | 7 tests | **ALL PASS** |
-| `tests/validations.test.ts` | 5 tests | **ALL PASS** |
-| `tests/permissions.test.ts` | 3 tests | **ALL PASS** |
-| `tests/invitations.test.ts` | 3 tests | **ALL PASS** |
-| `tests/doses.test.ts` | 3 tests | **ALL PASS** |
-| `tests/timezone.test.ts` | 3 tests | **ALL PASS** |
-| `tests/concurrency.test.ts` | 2 tests | **ALL PASS** |
-| `tests/seed-security.test.ts` | 1 test | **ALL PASS** |
+| Test Suite                      | Total Tests | Outcome      |
+| :------------------------------ | :---------- | :----------- |
+| `tests/signup-flow.test.ts`     | 17 tests    | **ALL PASS** |
+| `tests/mongo-client.test.ts`    | 6 tests     | **ALL PASS** |
+| `tests/email-reminders.test.ts` | 14 tests    | **ALL PASS** |
+| `tests/auth.test.ts`            | 5 tests     | **ALL PASS** |
+| `tests/authorization.test.ts`   | 4 tests     | **ALL PASS** |
+| `tests/schedules.test.ts`       | 7 tests     | **ALL PASS** |
+| `tests/validations.test.ts`     | 5 tests     | **ALL PASS** |
+| `tests/permissions.test.ts`     | 3 tests     | **ALL PASS** |
+| `tests/invitations.test.ts`     | 3 tests     | **ALL PASS** |
+| `tests/doses.test.ts`           | 3 tests     | **ALL PASS** |
+| `tests/timezone.test.ts`        | 3 tests     | **ALL PASS** |
+| `tests/concurrency.test.ts`     | 2 tests     | **ALL PASS** |
+| `tests/seed-security.test.ts`   | 1 test      | **ALL PASS** |
 
 ---
 
 ## 8. Quality & Production Build Results
 
-| Check | Command | Result |
-| :--- | :--- | :--- |
-| **TypeScript Validation** | `npm run typecheck` (`tsc --noEmit`) | **0 Errors** |
-| **ESLint Check** | `npm run lint` (`eslint .`) | **0 Warnings / 0 Errors** |
-| **Prettier Formatting** | `npm run format:check` | **100% Compliant** |
-| **Production Build** | `npm run build` (Next.js Turbopack) | **34/34 Routes Compiled Successfully** |
-| **Security Audit** | `npm audit --omit=dev` | **0 Vulnerabilities** |
+| Check                     | Command                              | Result                                 |
+| :------------------------ | :----------------------------------- | :------------------------------------- |
+| **TypeScript Validation** | `npm run typecheck` (`tsc --noEmit`) | **0 Errors**                           |
+| **ESLint Check**          | `npm run lint` (`eslint .`)          | **0 Warnings / 0 Errors**              |
+| **Prettier Formatting**   | `npm run format:check`               | **100% Compliant**                     |
+| **Production Build**      | `npm run build` (Next.js Turbopack)  | **34/34 Routes Compiled Successfully** |
+| **Security Audit**        | `npm audit --omit=dev`               | **0 Vulnerabilities**                  |
 
 ---
 
