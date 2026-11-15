@@ -24,7 +24,7 @@ vi.mock('@/lib/email', () => ({
     mockDeliveries[params.idempotencyKey] = { status: 'sent' };
     return Promise.resolve({
       success: true,
-      messageId: 'resend_msg_mock_123',
+      messageId: 'brevo_msg_mock_123',
       status: 'sent',
     });
   }),

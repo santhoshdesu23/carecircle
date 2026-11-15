@@ -239,7 +239,13 @@ export interface ReminderDelivery {
   _id: string;
   elderlyProfileId: string;
   referenceType:
-    'dose_upcoming' | 'dose_missed' | 'appointment_24h' | 'appointment_2h' | 'invitation';
+    | 'dose_upcoming'
+    | 'dose_missed'
+    | 'appointment_24h'
+    | 'appointment_2h'
+    | 'invitation'
+    | 'verification'
+    | 'password_reset';
   referenceId: string;
   recipientUserId: string;
   recipientEmail: string;
@@ -247,6 +253,7 @@ export interface ReminderDelivery {
   status: 'pending' | 'sent' | 'failed' | 'skipped';
   attempts: number;
   sentAt?: Date;
+  providerMessageId?: string;
   error?: string;
   createdAt: Date;
 }

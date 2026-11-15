@@ -13,7 +13,7 @@ Managing multiple daily medications, clinical visits, and daily routines can be 
 - **Elderly-First Design:** Features a dedicated **Senior Mode** with 52–64px touch targets, high-contrast typography, simplified cards, and text-to-speech Web Speech API audio assistance.
 - **Passcode-Based Shared Access:** No shared credentials. Authorized caretakers and family members join via single-use 8-digit random numeric passcodes with 15-minute expiration windows, hashed with cryptographic salts (HMAC-SHA256).
 - **Medication & Adherence Engine:** Full CRUD for medications, frequencies, and dosage times. Records taken, skipped, and missed doses with user attribution and concurrency protection.
-- **Smart Notification Engine:** Automated background reminder engine detecting upcoming doses (15–30m window), missed doses (grace period expiration), and doctor appointments (24h and 2h lead times) sending transactional HTML emails via Resend with database idempotency protection.
+- **Smart Notification Engine:** Automated background reminder engine detecting upcoming doses (15–30m window), missed doses (grace period expiration), and doctor appointments (24h and 2h lead times) sending transactional HTML emails via Brevo (@getbrevo/brevo) with database idempotency protection.
 - **Caregiver Handover Notes & Care Timeline:** Chronological shifts, notes, and activity feed logging who updated what and when.
 - **Strict Vercel Architecture:** 100% serverless Next.js App Router code ready for Vercel deployment with MongoDB Atlas persistent storage.
 
@@ -29,7 +29,7 @@ Managing multiple daily medications, clinical visits, and daily routines can be 
 | **Accessibility**  | Senior Mode & Speech Synthesis | WCAG 2.2 AA target, Web Speech API audio read-aloud                                               |
 | **Database**       | MongoDB Atlas / Node Driver    | Connection pool caching, indexed collections                                                      |
 | **Authentication** | Stateless JWT (jose)           | HttpOnly, SameSite=Lax, Secure cookies, bcryptjs (10 rounds)                                      |
-| **Email Delivery** | Resend                         | Professional HTML templates, idempotent delivery records                                          |
+| **Email Delivery** | Brevo (@getbrevo/brevo)        | Professional HTML templates, idempotent delivery records                                          |
 | **Scheduling**     | Vercel Cron & Route Handlers   | `vercel.json` recurring dispatcher (`/api/cron/dispatch-reminders`)                               |
 | **Testing**        | Vitest                         | Unit, integration, schema validation, and reminder tests                                          |
 | **Code Quality**   | Prettier & ESLint              | Next.js core web vitals and strict formatting                                                     |
@@ -103,16 +103,16 @@ MONGODB_DB=carecircle
 # Authentication Secret (32+ chars)
 AUTH_SECRET=carecircle-super-secret-production-key-32-chars-min!
 
-# Resend Transactional Email
-RESEND_API_KEY=re_your_api_key_here
+# Brevo Transactional Email
+BREVO_API_KEY=xkeysib-your_brevo_api_key_here
 EMAIL_FROM=CareCircle <notifications@yourdomain.com>
 
 # Vercel Cron Security Token
 CRON_SECRET=carecircle_cron_secure_token_secret
 ```
 
-> **Note on Local Development without Resend Credentials:**
-> When `RESEND_API_KEY` is omitted, the email engine safely logs outgoing emails to the console and records delivery records as `skipped` with clear notes, preventing false delivery assertions.
+> **Note on Local Development without Brevo Credentials:**
+> When `BREVO_API_KEY` is omitted, the email engine safely logs outgoing emails to the console and records delivery records as `skipped` with clear notes, preventing false delivery assertions.
 
 ---
 
@@ -160,7 +160,7 @@ CareCircle is built specifically for zero-configuration Vercel serverless deploy
    - `MONGODB_URI`: Connection string to MongoDB Atlas.
    - `MONGODB_DB`: `carecircle`.
    - `AUTH_SECRET`: Random 32+ character string.
-   - `RESEND_API_KEY`: Your Resend API key.
+   - `BREVO_API_KEY`: Your Brevo API key.
    - `EMAIL_FROM`: Verified sender email address.
    - `CRON_SECRET`: Random secret for Vercel Cron authorization.
 4. **Deploy:**

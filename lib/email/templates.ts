@@ -249,3 +249,85 @@ export function renderInvitationCodeEmail(params: {
   const text = `You've been invited to join ${params.elderlyName}'s Care Circle by ${params.inviterName}.\n\nPasscode: ${params.passcode}\n(Expires in ${params.expiresInMinutes} minutes)\n\nEnter this code in CareCircle to join.`;
   return { subject, html, text };
 }
+
+export function renderAccountVerificationEmail(params: {
+  name: string;
+  verificationUrl: string;
+  expiresInMinutes?: number;
+}): EmailTemplateResult {
+  const expiresIn = params.expiresInMinutes || 60;
+  const subject = 'Verify your email address for CareCircle';
+  const html = `
+    <div style="${baseStyles}">
+      <div style="${containerStyles}">
+        <div style="${headerStyles}">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 700;">CareCircle</h1>
+          <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9;">Account Verification</p>
+        </div>
+        <div style="padding: 28px;">
+          <h2 style="margin: 0 0 12px; font-size: 20px; color: #0F172A;">Welcome to CareCircle, ${params.name}</h2>
+          <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.5; color: #334155;">
+            Thank you for creating an account. Please verify your email address to ensure your account security and start coordinating care.
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${params.verificationUrl}" style="background-color: #0D9488; color: #FFFFFF; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+              Verify Email Address
+            </a>
+          </div>
+          <p style="margin: 20px 0 8px; font-size: 13px; color: #64748B;">
+            This verification link will expire in ${expiresIn} minutes.
+          </p>
+          <p style="margin: 0; font-size: 12px; color: #94A3B8; word-break: break-all;">
+            If the button doesn't work, copy and paste this link into your browser:<br />
+            <a href="${params.verificationUrl}" style="color: #0D9488;">${params.verificationUrl}</a>
+          </p>
+        </div>
+        <div style="${footerStyles}">
+          <p style="margin: 0;">&copy; ${new Date().getFullYear()} CareCircle. If you did not create this account, please ignore this email.</p>
+        </div>
+      </div>
+    </div>
+  `;
+  const text = `Welcome to CareCircle, ${params.name}!\n\nPlease verify your email address by visiting the link below:\n${params.verificationUrl}\n\nThis link will expire in ${expiresIn} minutes.`;
+  return { subject, html, text };
+}
+
+export function renderPasswordResetEmail(params: {
+  name: string;
+  resetUrl: string;
+  expiresInMinutes?: number;
+}): EmailTemplateResult {
+  const expiresIn = params.expiresInMinutes || 30;
+  const subject = 'Reset your CareCircle password';
+  const html = `
+    <div style="${baseStyles}">
+      <div style="${containerStyles}">
+        <div style="${headerStyles}">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 700;">CareCircle</h1>
+          <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9;">Security Alert</p>
+        </div>
+        <div style="padding: 28px;">
+          <h2 style="margin: 0 0 12px; font-size: 20px; color: #0F172A;">Password Reset Request</h2>
+          <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.5; color: #334155;">
+            Hello ${params.name}, we received a request to reset the password for your CareCircle account.
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${params.resetUrl}" style="background-color: #0D9488; color: #FFFFFF; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+              Reset Password
+            </a>
+          </div>
+          <div style="background-color: #FEF3C7; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px; margin-top: 24px;">
+            <p style="margin: 0; font-size: 13px; color: #92400E; font-weight: 500;">
+              This link is single-use and will expire in ${expiresIn} minutes. If you did not request a password reset, no changes have been made and you can safely ignore this email.
+            </p>
+          </div>
+        </div>
+        <div style="${footerStyles}">
+          <p style="margin: 0;">&copy; ${new Date().getFullYear()} CareCircle. Never share your password or reset link with anyone.</p>
+        </div>
+      </div>
+    </div>
+  `;
+  const text = `CareCircle Password Reset\n\nHello ${params.name},\nWe received a request to reset your password. Use the following link within ${expiresIn} minutes:\n${params.resetUrl}\n\nIf you did not make this request, you can safely ignore this message.`;
+  return { subject, html, text };
+}
