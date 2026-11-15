@@ -1,4 +1,5 @@
 export type UserRole = 'elderly' | 'family' | 'caretaker';
+export type UserAccountStatus = 'pending_verification' | 'active' | 'disabled';
 
 export interface User {
   _id: string;
@@ -6,7 +7,9 @@ export interface User {
   email: string;
   passwordHash: string;
   emailVerified: boolean;
+  status?: UserAccountStatus;
   emailVerificationToken?: string | null;
+  emailVerificationExpires?: Date | null;
   resetPasswordToken?: string | null;
   resetPasswordExpires?: Date | null;
   defaultRole: UserRole;

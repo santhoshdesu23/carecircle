@@ -8,7 +8,7 @@ import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for') || 'local';
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
     const rateLimit = await checkRateLimit(`signin_${ip}`, 10, 900);
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -32,6 +32,13 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+    }
+
+    if (user.status === 'disabled') {
+      return NextResponse.json(
+        { error: 'This account has been disabled. Please contact support.' },
+        { status: 403 }
+      );
     }
 
     const isValid = await verifyPassword(password, user.passwordHash);
@@ -81,6 +88,25 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: unknown) {
+    const isDbError =
+      (error as any)?.name === 'MongoServerSelectionError' ||
+      (error as any)?.code === 'ENOTFOUND' ||
+      (error as any)?.name === 'MongoNetworkError' ||
+      (error as any)?.name === 'MongoTimeoutError' ||
+      (error as any)?.message?.includes('querySrv') ||
+      (error as any)?.message?.includes('ECONNREFUSED');
+
+    if (isDbError) {
+      console.error('[Signin API] Database connectivity failure:', error);
+      return NextResponse.json(
+        {
+          error: 'The database service is temporarily unavailable. Please try again shortly.',
+          code: 'DATABASE_UNAVAILABLE',
+        },
+        { status: 503 }
+      );
+    }
+
     console.error('Signin error:', error);
     return NextResponse.json(
       { error: 'An unexpected error occurred during signin.' },
